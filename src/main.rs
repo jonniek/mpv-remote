@@ -6,28 +6,18 @@ use rocket::State;
 use std::env;
 use std::{fs::File, io::Write};
 
+const VALID_LONG_COMMANDS: [&'static str;3] = [
+  "add",
+  "cycle",
+  "set",
+];
+
+const VALID_SHORT_COMMANDS: [&'static str;1] = [
+  "seek",
+];
+
 struct AppState {
   ipc_socket_path: String
-}
-
-enum Command {
-  TogglePause,
-  Seek(i32),
-}
-
-const SEEK_BACK: Command = Command::Seek(-5);
-const SEEK_FORWARD: Command = Command::Seek(5);
-const PAUSE: Command = Command::TogglePause;
-
-fn command_string(command: Command) -> String {
-  match command {
-    Command::TogglePause => {
-      "{\"command\":[\"cycle\",\"pause\"]}\n".to_string()
-    },
-    Command::Seek(amount) => {
-      format!("{{\"command\":[\"seek\",{},\"exact\"]}}\n", amount)
-    }
-  }
 }
 
 fn write_file(bytes: &[u8], path: &str) -> std::io::Result<()> {
@@ -36,10 +26,9 @@ fn write_file(bytes: &[u8], path: &str) -> std::io::Result<()> {
   Ok(())
 }
 
-fn write_command(com: Command, path: &str) {
-  let command = command_string(com);
-
-  match write_file(command.as_bytes(), path) {
+fn write_raw_command(com: &str, path: &str) {
+  println!("Writing command to IPC socket: {}", com);
+  match write_file(com.as_bytes(), path) {
     Ok(_) => (),
     Err(e) => eprintln!("{}", e),
   }
@@ -53,23 +42,29 @@ fn get_socket_path() -> String {
   args[1].to_owned()
 }
 
-#[post("/pause")]
-fn pause(state: &State<AppState>) -> Redirect {
-  write_command(PAUSE, &state.ipc_socket_path);
+
+#[post("/<command>/<name>/<value>")]
+fn long_command(command: &str, name: &str, value: &str, state: &State<AppState>) -> Redirect {
+
+  if VALID_LONG_COMMANDS.contains(&command) {
+    let command_string = format!("{{\"command\":[\"{}\",\"{}\",\"{}\"]}}\n", command, name, value);
+    write_raw_command(&command_string, &state.ipc_socket_path);
+  } else {
+    eprintln!("unexpected command {}", command);
+  }
 
   Redirect::to(uri!(index))
 }
 
-#[post("/seek-back")]
-fn seek_back(state: &State<AppState>) -> Redirect {
-  write_command(SEEK_BACK, &state.ipc_socket_path);
+#[post("/<command>/<value>")]
+fn short_command(command: &str, value: &str, state: &State<AppState>) -> Redirect {
 
-  Redirect::to(uri!(index))
-}
-
-#[post("/seek-forward")]
-fn seek_forward(state: &State<AppState>) -> Redirect {
-  write_command(SEEK_FORWARD, &state.ipc_socket_path);
+  if VALID_SHORT_COMMANDS.contains(&command) {
+    let command_string = format!("{{\"command\":[\"{}\",\"{}\"]}}\n", command, value);
+    write_raw_command(&command_string, &state.ipc_socket_path);
+  } else {
+    eprintln!("unexpected command {}", command);
+  }
 
   Redirect::to(uri!(index))
 }
@@ -89,48 +84,79 @@ fn rocket() -> _ {
 
   rocket::custom(figment)
     .mount("/", routes![index])
-    .mount("/", routes![pause])
-    .mount("/", routes![seek_forward])
-    .mount("/", routes![seek_back])
+    .mount("/", routes![short_command])
+    .mount("/", routes![long_command])
     .manage(AppState { ipc_socket_path })
 }
 
 const PAGE: &'static str = r#"
-<title>mpv-remote</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  html {
-    padding: 16px;
-    background: #111;
-  }
-  body {
-    height: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-auto-rows: 100px;
-    gap: 16px;
-  }
-  button {
-    font-size: 25px;
-    font-weight: bold;
-    color: #fff;
-    background: #61931a;
-    width: 100%;
-    border: none;
-    border-radius: 4px;
-    height: 100%;
-  }
-</style>
+<head>
+  <title>mpv-remote</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html {
+      padding: 16px;
+      background: #111;
+    }
+    body {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-auto-rows: 100px;
+      gap: 16px;
+    }
+    button {
+      font-size: 25px;
+      font-weight: bold;
+      color: #fff;
+      background: #61931a;
+      width: 100%;
+      border: none;
+      border-radius: 4px;
+      height: 100%;
+    }
 
-<form action="/seek-back" method="post">
-  <button type="submit">&lt&lt</button>
-</form>
+    .wide {
+      grid-column: 1 / 3;
+    }
 
-<form action="/seek-forward" method="post">
-    <button type="submit">&gt&gt</button>
-</form>
+    .narrow {
+      grid-column:
+    }
 
-<form action="/pause" method="post">
+  </style>
+</head>
+<body>
+  <form action="/cycle/pause/up" method="post" class="wide">
     <button type="submit">pause</button>
-</form>
+  </form>
+
+  <form action="/seek/-5" method="post">
+    <button type="submit">&lt&lt</button>
+  </form>
+
+  <form action="/seek/5" method="post">
+      <button type="submit">&gt&gt</button>
+  </form>
+
+  <form action="/add/volume/-10" method="post">
+    <button type="submit">- vol</button>
+  </form>
+
+  <form action="/add/volume/10" method="post">
+    <button type="submit">+ vol</button>
+  </form>
+
+  <form action="/cycle/aid/up" method="post">
+    <button type="submit">aid</button>
+  </form>
+
+  <form action="/cycle/sid/up" method="post">
+    <button type="submit">sid</button>
+  </form>
+
+  <form action="/cycle/secondary-sid/up" method="post">
+    <button type="submit">ssid</button>
+  </form>
+</body>
 "#;

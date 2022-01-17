@@ -7,9 +7,11 @@ if socket == nil or socket == "" then
   mp.set_property("input-ipc-server", socket)
 end
 
-mp.command_native_async({
+local server = mp.command_native_async({
   name = "subprocess",
   playback_only = false,
   capture_stdout = true,
   args = { "mpv-remote-server", socket },
 })
+
+mp.register_event('shutdown', function() mp.abort_async_command(server) end)

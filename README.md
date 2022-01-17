@@ -1,6 +1,6 @@
 This script is heavily under development. I'm basically just adding functionality by my own need. I published the script for people who want something basic to hack around with. If you need a more serious mpv-remote I would recommend [open-dynaMIX/simple-mpv-webui](https://github.com/open-dynaMIX/simple-mpv-webui).
 
-When you open mpv, this script will run a http server that will serve a basic remote web app at `0.0.0.0:8000/` (localhost). The server will forward any commands clicked by user to the mpv ipc socket to execute commands for the player. I haven't so far seen much use for other features than seek and pause(thus they are only features for now).
+When you open mpv, this script will run a http server that will serve a basic remote web app at `0.0.0.0:8000/` (localhost). The server will forward any commands clicked by user to the mpv ipc socket to execute commands for the player.
 
 ## Requirements
 - Cargo and rustc to build the server binary
