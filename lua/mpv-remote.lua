@@ -1,5 +1,3 @@
-local msg = require("mp.msg")
-local utils = require("mp.utils")
 local socket = mp.get_property("input-ipc-server")
 
 if socket == nil or socket == "" then
