@@ -21,6 +21,12 @@ struct AppState {
   ipc_socket_path: String
 }
 
+struct Args {
+  ipc_socket_path: String,
+  address: String,
+  port: i32,
+}
+
 fn write_file(bytes: &[u8], path: &str) -> std::io::Result<()> {
   if env::consts::OS == "windows" {
     // windows uses named pipes
@@ -43,12 +49,17 @@ fn write_raw_command(com: &str, path: &str) {
   }
 }
 
-fn get_socket_path() -> String {
+fn get_args() -> Args {
   let args: Vec<String> = env::args().collect();
-  if args.len() != 2 {
-    panic!("IPC socket path is required argument")
+  if args.len() != 4 {
+    panic!("IPC socket path, address, port are required params")
   }
-  args[1].to_owned()
+
+  Args {
+    ipc_socket_path: args[1].to_owned(),
+    address: args[2].to_owned(),
+    port: args[3].to_owned().parse::<i32>().expect("Parsing port failed")
+  }
 }
 
 
@@ -69,7 +80,7 @@ fn long_command(command: &str, name: &str, value: &str, state: &State<AppState>)
 fn short_command(command: &str, value: &str, state: &State<AppState>) -> Redirect {
 
   if VALID_SHORT_COMMANDS.contains(&command) {
-    let command_string = format!("{{\"command\":[\"{}\",\"{}\"]}}\n", command, value);
+    let command_string = format!("{{\"command\":[\"osd-msg\",\"{}\",\"{}\"]}}\n", command, value);
     write_raw_command(&command_string, &state.ipc_socket_path);
   } else {
     eprintln!("unexpected command {}", command);
@@ -85,17 +96,17 @@ fn index() -> Html<&'static str> {
 
 #[launch]
 fn rocket() -> _ {
-  let ipc_socket_path = get_socket_path();
+  let args = get_args();
 
   let figment = rocket::Config::figment()
-    .merge(("address", "0.0.0.0"))
-    .merge(("port", 8000));
+    .merge(("address", args.address))
+    .merge(("port", args.port));
 
   rocket::custom(figment)
     .mount("/", routes![index])
     .mount("/", routes![short_command])
     .mount("/", routes![long_command])
-    .manage(AppState { ipc_socket_path })
+    .manage(AppState { ipc_socket_path: args.ipc_socket_path })
 }
 
 const PAGE: &'static str = r#"
