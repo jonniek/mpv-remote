@@ -56,7 +56,7 @@ fn get_socket_path() -> String {
 fn long_command(command: &str, name: &str, value: &str, state: &State<AppState>) -> Redirect {
 
   if VALID_LONG_COMMANDS.contains(&command) {
-    let command_string = format!("{{\"command\":[\"{}\",\"{}\",\"{}\"]}}\n", command, name, value);
+    let command_string = format!("{{\"command\":[\"osd-msg\",\"{}\",\"{}\",\"{}\"]}}\n", command, name, value);
     write_raw_command(&command_string, &state.ipc_socket_path);
   } else {
     eprintln!("unexpected command {}", command);
