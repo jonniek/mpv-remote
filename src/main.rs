@@ -4,7 +4,12 @@ use rocket::response::Redirect;
 use rocket::State;
 
 use std::env;
-use std::{fs::File, io::Write};
+use std::{io::Write};
+
+#[cfg(windows)]
+use std::fs::File;
+
+#[cfg(unix)]
 use std::os::unix::net::{UnixStream};
 
 const VALID_LONG_COMMANDS: [&'static str;3] = [
@@ -27,16 +32,18 @@ struct Args {
   port: i32,
 }
 
+#[cfg(windows)]
 fn write_file(bytes: &[u8], path: &str) -> std::io::Result<()> {
-  if env::consts::OS == "windows" {
-    // windows uses named pipes
-    let mut file = File::create(path)?;
-    file.write_all(bytes)?;
-  } else {
-    // unix uses sockets
-    let mut unix_stream = UnixStream::connect(path)?;
-    unix_stream.write_all(bytes)?;
-  }
+  let mut file = File::create(path)?;
+  file.write_all(bytes)?;
+
+  Ok(())
+}
+
+#[cfg(unix)]
+fn write_file(bytes: &[u8], path: &str) -> std::io::Result<()> {
+  let mut unix_stream = UnixStream::connect(path)?;
+  unix_stream.write_all(bytes)?;
 
   Ok(())
 }
